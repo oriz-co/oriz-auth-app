@@ -1,0 +1,179 @@
+---
+// /admin/flags — feature-flag admin UI for the family.
+//
+// Gated client-side by Firebase Auth + a server-side allowlist check at the
+// Worker (ADMIN_ALLOWLIST_UIDS). The page itself is public HTML; the API
+// calls embedded below all 401 unless the caller's Firebase ID token's uid
+// is on the allowlist. So no extra server-side gate is needed here.
+//
+// Designed for phone use at 2am: large tap targets, single-column on
+// mobile, one toggle per flag, no confirmation dialogs (the audit table
+// captures every change anyway).
+import DashboardLayout from '~/layouts/DashboardLayout.astro'
+
+const FLAGS_ORIGIN = 'https://flags.oriz.in'
+---
+
+<DashboardLayout title="Feature flags — admin" section="admin">
+  <h1>Feature flags</h1>
+  <p class="lede">
+    Every toggle takes effect within ~60 seconds across all 30 apps. Audit log
+    captures every change. If something looks weird, the gist DR snapshot is
+    at most 24 h stale.
+  </p>
+
+  <div id="loading" class="muted">Loading…</div>
+  <div id="error" class="muted error" hidden></div>
+  <div id="flag-list" hidden></div>
+
+  <details class="card raw">
+    <summary>Add a new flag</summary>
+    <form id="new-flag">
+      <label>
+        Key
+        <input name="key" placeholder="razorpay-checkout-enabled" required />
+      </label>
+      <label>
+        Type
+        <select name="type">
+          <option value="bool" selected>boolean</option>
+          <option value="string">string</option>
+          <option value="number">number</option>
+        </select>
+      </label>
+      <label>
+        Default
+        <input name="default" placeholder="true" required />
+      </label>
+      <button type="submit">Create</button>
+    </form>
+  </details>
+
+  <style>
+    h1 { font-family: var(--serif); font-size: clamp(1.5rem, 4vw, 2rem); margin: 0 0 8px; }
+    .lede { color: var(--muted); margin: 0 0 28px; max-width: 60ch; }
+    .card { background: var(--card,#fff); border: 1px solid var(--rule,#e6dfd2); border-radius: 12px; padding: 18px; margin-bottom: 14px; }
+    .card h2 { margin: 0 0 4px; font-family: var(--serif); font-size: 1.05rem; }
+    .flag-row { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--rule,#e6dfd2); }
+    .flag-row:last-child { border: 0; }
+    .flag-info { flex: 1; min-width: 0; }
+    .flag-key { font-family: var(--mono); font-weight: 500; font-size: 0.95rem; }
+    .flag-meta { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+    .toggle { width: 56px; height: 32px; position: relative; flex-shrink: 0; }
+    .toggle input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; margin: 0; }
+    .toggle .track { position: absolute; inset: 0; background: #cfc9bb; border-radius: 16px; transition: background 0.18s; }
+    .toggle .knob { position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; background: #fff; border-radius: 50%; transition: transform 0.18s; }
+    .toggle input:checked ~ .track { background: var(--accent,#c1440e); }
+    .toggle input:checked ~ .knob { transform: translateX(24px); }
+    .rules-summary { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .error { color: #dc2626; }
+    .raw form { display: grid; gap: 10px; margin-top: 8px; }
+    .raw label { display: grid; gap: 4px; font-size: 0.88rem; }
+    .raw input, .raw select { padding: 8px; border: 1px solid var(--rule,#e6dfd2); border-radius: 6px; }
+    .raw button { padding: 9px 18px; background: var(--accent); color: #faf6ef; border: 0; border-radius: 6px; cursor: pointer; }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+  </style>
+
+  <script define:vars={{ FLAGS_ORIGIN }}>
+    import { getFirebase } from '~/lib/firebase'
+    import { onAuthStateChanged } from 'firebase/auth'
+
+    const { auth } = getFirebase()
+    const loadingEl = document.getElementById('loading')
+    const errorEl = document.getElementById('error')
+    const listEl = document.getElementById('flag-list')
+
+    async function withToken() {
+      const u = auth.currentUser
+      if (!u) return null
+      return u.getIdToken()
+    }
+
+    function fail(msg) {
+      loadingEl.hidden = true
+      errorEl.hidden = false
+      errorEl.textContent = msg
+    }
+
+    async function load() {
+      const token = await withToken()
+      if (!token) return fail('Not signed in — go to /sign-in')
+      try {
+        const r = await fetch(`${FLAGS_ORIGIN}/admin/list`, { headers: { authorization: `Bearer ${token}` } })
+        if (r.status === 401) return fail('You are not on the admin allowlist.')
+        if (!r.ok) return fail(`Flag service: ${r.status} ${r.statusText}`)
+        const { flags, rules } = await r.json()
+        loadingEl.hidden = true
+        listEl.hidden = false
+        renderFlags(flags ?? [], rules ?? [])
+      } catch (e) {
+        fail(`Network error: ${e.message}`)
+      }
+    }
+
+    function renderFlags(flags, allRules) {
+      listEl.innerHTML = ''
+      for (const f of flags) {
+        const card = document.createElement('div')
+        card.className = 'card'
+        const rules = allRules.filter((r) => r.flag_key === f.key)
+        const ruleSummary = rules.length ? `${rules.length} rule${rules.length === 1 ? '' : 's'}` : 'no rules — default only'
+        const isBool = f.variant_type === 'bool'
+        const checked = isBool && (f.default_variant === 'true' || f.default_variant === '1')
+        card.innerHTML = `
+          <div class="flag-row">
+            <div class="flag-info">
+              <div class="flag-key">${escapeHtml(f.key)}</div>
+              <div class="flag-meta">${f.variant_type} · default <strong>${escapeHtml(f.default_variant)}</strong> · ${ruleSummary}</div>
+              <div class="rules-summary">${rules.map((r) => `${escapeHtml(r.segment_key)} → ${escapeHtml(r.variant)}`).join(' &nbsp; ')}</div>
+            </div>
+            ${
+              isBool
+                ? `<label class="toggle" aria-label="Toggle ${escapeHtml(f.key)}">
+                     <input type="checkbox" data-key="${escapeHtml(f.key)}" ${checked ? 'checked' : ''} />
+                     <span class="track"></span>
+                     <span class="knob"></span>
+                   </label>`
+                : `<input type="text" data-key="${escapeHtml(f.key)}" data-type="${f.variant_type}" value="${escapeHtml(f.default_variant)}" />`
+            }
+          </div>
+        `
+        listEl.appendChild(card)
+      }
+      listEl.querySelectorAll('input[type="checkbox"][data-key]').forEach((el) =>
+        el.addEventListener('change', () => upsert(el.dataset.key, 'bool', el.checked ? 'true' : 'false', []))
+      )
+      listEl.querySelectorAll('input[type="text"][data-key]').forEach((el) =>
+        el.addEventListener('blur', () => upsert(el.dataset.key, el.dataset.type, el.value, []))
+      )
+    }
+
+    async function upsert(key, type, def, rules) {
+      const token = await withToken()
+      if (!token) return fail('signed out')
+      const r = await fetch(`${FLAGS_ORIGIN}/admin/upsert`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ key, type, default: def, rules }),
+      })
+      if (!r.ok) fail(`Save failed: ${r.status}`)
+    }
+
+    document.getElementById('new-flag')?.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const fd = new FormData(e.target)
+      await upsert(fd.get('key'), fd.get('type'), fd.get('default'), [])
+      load()
+      e.target.reset()
+    })
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))
+    }
+
+    onAuthStateChanged(auth, (u) => {
+      if (u) load()
+      else fail('Not signed in. Go to /sign-in?return=/admin/flags')
+    })
+  </script>
+</DashboardLayout>
