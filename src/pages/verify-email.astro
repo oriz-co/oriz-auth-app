@@ -1,0 +1,54 @@
+---
+import BaseLayout from '~/layouts/BaseLayout.astro'
+import Brand from '~/components/Brand.astro'
+---
+<BaseLayout title="Verify email · oriz">
+  <section class="card center-text">
+    <Brand />
+    <h1>Verify your email</h1>
+    <p class="sub" id="msg">Send a verification link to your inbox.</p>
+
+    <button class="btn btn-primary" id="send" type="button">
+      <span class="label">Send verification email</span>
+    </button>
+    <a class="btn btn-ghost" href="/account" style="margin-top:0.6rem;">
+      <span class="label">Back to account</span>
+    </a>
+
+    <div id="banner" class="banner" data-kind="info"></div>
+  </section>
+
+  <script>
+    import { sendEmailVerification } from 'firebase/auth'
+    import { getFirebase, startCookieSync } from '~/lib/firebase'
+    const { auth } = getFirebase()
+    startCookieSync()
+
+    const banner = document.getElementById('banner') as HTMLDivElement
+    const msg = document.getElementById('msg') as HTMLParagraphElement
+    const show = (m: string, k: 'info' | 'error' | 'success' = 'info') => {
+      banner.textContent = m
+      banner.dataset.kind = k
+      banner.style.display = 'block'
+    }
+
+    auth.onAuthStateChanged((user) => {
+      if (!user) { window.location.replace('/sign-in?return=' + encodeURIComponent('/verify-email')); return }
+      msg.textContent = user.emailVerified
+        ? `${user.email} is verified.`
+        : `Send a verification link to ${user.email}.`
+    })
+
+    document.getElementById('send')!.addEventListener('click', async () => {
+      const u = auth.currentUser
+      if (!u) return
+      try {
+        await sendEmailVerification(u)
+        show('Verification email sent. Check your inbox.', 'success')
+      } catch (err) {
+        const e = err as { message?: string }
+        show(e.message ?? 'Failed to send.', 'error')
+      }
+    })
+  </script>
+</BaseLayout>

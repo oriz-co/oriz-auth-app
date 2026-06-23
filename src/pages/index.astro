@@ -1,0 +1,24 @@
+---
+// Static landing — redirect to /sign-in if no Firebase user; otherwise to /account.
+import BaseLayout from '~/layouts/BaseLayout.astro'
+import Brand from '~/components/Brand.astro'
+---
+<BaseLayout title="oriz · sign in">
+  <section class="card center-text">
+    <Brand />
+    <h1>oriz</h1>
+    <p class="sub">One sign-in for everything in the oriz family.</p>
+    <p class="muted">Loading…</p>
+  </section>
+
+  <script>
+    import { getFirebase } from '~/lib/firebase'
+    const { auth } = getFirebase()
+    auth.onAuthStateChanged((user) => {
+      window.location.replace(user ? '/account' : '/sign-in')
+    })
+    setTimeout(() => {
+      if (location.pathname === '/') window.location.replace('/sign-in')
+    }, 2500)
+  </script>
+</BaseLayout>

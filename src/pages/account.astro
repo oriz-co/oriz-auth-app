@@ -1,0 +1,56 @@
+---
+import BaseLayout from '~/layouts/BaseLayout.astro'
+import Brand from '~/components/Brand.astro'
+---
+<BaseLayout title="Your account · oriz">
+  <section class="card">
+    <Brand />
+    <h1>Your account</h1>
+    <p class="sub">Signed in across the oriz family.</p>
+
+    <div class="user-card" id="user-card" style="display:none;">
+      <div class="avatar" id="avatar">·</div>
+      <div>
+        <div class="name" id="display-name">—</div>
+        <div class="email" id="email">—</div>
+      </div>
+    </div>
+
+    <p id="loading" class="muted">Loading…</p>
+
+    <div class="stack" style="margin-top:1.25rem;">
+      <div class="muted tiny" id="providers">Providers: —</div>
+      <a class="btn" href="/verify-email">
+        <span class="label">Manage email verification</span>
+      </a>
+      <a class="btn" href="/sign-out">
+        <span class="label">Sign out</span>
+      </a>
+    </div>
+
+    <p class="tiny" style="margin-top:1rem;" id="uid">—</p>
+  </section>
+
+  <script>
+    import { getFirebase, startCookieSync } from '~/lib/firebase'
+    const { auth } = getFirebase()
+    startCookieSync()
+
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        window.location.replace('/sign-in?return=/account')
+        return
+      }
+      document.getElementById('loading')!.style.display = 'none'
+      const card = document.getElementById('user-card')!
+      card.style.display = 'flex'
+      const initial = (user.displayName || user.email || '?').trim().charAt(0).toUpperCase()
+      document.getElementById('avatar')!.textContent = initial
+      document.getElementById('display-name')!.textContent = user.displayName || '(no name set)'
+      document.getElementById('email')!.textContent = user.email || user.phoneNumber || ''
+      document.getElementById('uid')!.textContent = 'uid: ' + user.uid
+      const provs = (user.providerData || []).map((p) => p.providerId).join(', ') || 'none'
+      document.getElementById('providers')!.textContent = 'Signed in via: ' + provs
+    })
+  </script>
+</BaseLayout>

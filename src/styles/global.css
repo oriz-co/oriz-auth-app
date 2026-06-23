@@ -1,0 +1,254 @@
+/* oriz-auth-app — paper-tone, serif headings, premium sign-in feel.
+   Aligned with oriz-roam-journal-app's palette: cream/sepia bg, forest-green accents.
+   Bunny Fonts (per family rule — not Google Fonts). */
+@import url('https://fonts.bunny.net/css?family=crimson-pro:400,500,600|inter:400,500,600&display=swap');
+
+:root {
+  --paper: #faf6ef;
+  --paper-ink: #f4ecdc;
+  --ink: #1a1a1a;
+  --ink-soft: #4a4a4a;
+  --ink-faint: #8a8a8a;
+  --rule: #d9d0bd;
+  --forest: #2f4f3a;
+  --forest-deep: #1f3527;
+  --accent: #b8541f;
+  --danger: #8b2a1b;
+  --radius: 10px;
+  --shadow-soft: 0 1px 2px rgba(20, 15, 5, 0.04), 0 4px 16px rgba(20, 15, 5, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #14140f;
+    --paper-ink: #1c1c16;
+    --ink: #f2ead8;
+    --ink-soft: #c0b89f;
+    --ink-faint: #7a7261;
+    --rule: #2d2a22;
+    --forest: #7fae8d;
+    --forest-deep: #a5c9b1;
+    --accent: #e08b58;
+    --danger: #d77b6b;
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3 {
+  font-family: 'Crimson Pro', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--ink);
+}
+
+h1 { font-size: 2.1rem; line-height: 1.15; }
+h2 { font-size: 1.4rem; line-height: 1.25; }
+
+a { color: var(--forest); text-decoration: none; }
+a:hover { color: var(--forest-deep); text-decoration: underline; text-underline-offset: 3px; }
+
+/* layout */
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.center {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+}
+
+.card {
+  background: var(--paper-ink);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 2rem 1.75rem;
+  width: 100%;
+  max-width: 26rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.card h1 { margin-bottom: 0.25rem; }
+.card .sub { color: var(--ink-soft); margin-bottom: 1.5rem; font-size: 0.95rem; }
+
+/* buttons */
+.btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.95rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 120ms, transform 120ms, box-shadow 120ms;
+  text-align: left;
+}
+.btn:hover { border-color: var(--forest); transform: translateY(-1px); box-shadow: var(--shadow-soft); }
+.btn:active { transform: translateY(0); }
+.btn:focus-visible { outline: 2px solid var(--forest); outline-offset: 2px; }
+.btn[disabled] { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.btn .icon { width: 18px; height: 18px; flex: 0 0 18px; }
+.btn .label { flex: 1; }
+
+.btn-primary {
+  background: var(--forest);
+  color: var(--paper);
+  border-color: var(--forest);
+}
+.btn-primary:hover { background: var(--forest-deep); border-color: var(--forest-deep); color: var(--paper); }
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-soft);
+  justify-content: center;
+}
+.btn-ghost:hover { color: var(--forest); border-color: transparent; box-shadow: none; transform: none; }
+
+.stack > * + * { margin-top: 0.6rem; }
+.stack-lg > * + * { margin-top: 1rem; }
+
+/* divider with label */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--ink-faint);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 1.25rem 0;
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+/* inputs */
+.field { display: flex; flex-direction: column; gap: 0.35rem; }
+.field label { font-size: 0.85rem; color: var(--ink-soft); }
+.field input {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.field input:focus { outline: 2px solid var(--forest); outline-offset: 1px; border-color: var(--forest); }
+
+/* status bar */
+.banner {
+  margin-top: 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  display: none;
+}
+.banner[data-kind="error"] { background: rgba(139, 42, 27, 0.08); color: var(--danger); display: block; }
+.banner[data-kind="success"] { background: rgba(47, 79, 58, 0.08); color: var(--forest-deep); display: block; }
+.banner[data-kind="info"] { background: rgba(184, 84, 31, 0.08); color: var(--accent); display: block; }
+
+/* tier-gated section */
+.more {
+  margin-top: 1rem;
+  text-align: center;
+}
+.more button {
+  background: none;
+  border: 0;
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+.more button:hover { color: var(--forest); }
+.gated { display: none; margin-top: 0.6rem; }
+.gated[data-open="true"] { display: block; }
+
+/* footer */
+footer.site {
+  border-top: 1px solid var(--rule);
+  padding: 1.5rem 1rem;
+  color: var(--ink-faint);
+  font-size: 0.85rem;
+  text-align: center;
+}
+footer.site a { color: var(--ink-soft); }
+footer.site a:hover { color: var(--forest); }
+
+/* utility */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+  margin-bottom: 1.5rem;
+}
+.brand .mark {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--forest);
+  color: var(--paper);
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-family: 'Crimson Pro', serif;
+  font-size: 1rem;
+}
+
+.muted { color: var(--ink-soft); font-size: 0.9rem; }
+.tiny { font-size: 0.8rem; color: var(--ink-faint); }
+.center-text { text-align: center; }
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.user-card .avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--forest);
+  color: var(--paper);
+  display: grid;
+  place-items: center;
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.2rem;
+}
+.user-card .name { font-weight: 500; }
+.user-card .email { color: var(--ink-soft); font-size: 0.85rem; }

@@ -1,0 +1,23 @@
+---
+import BaseLayout from '~/layouts/BaseLayout.astro'
+import Brand from '~/components/Brand.astro'
+---
+<BaseLayout title="Signing out · oriz">
+  <section class="card center-text">
+    <Brand />
+    <h1>Signing out…</h1>
+    <p class="sub" id="msg">Clearing your session.</p>
+  </section>
+
+  <script>
+    import { signOut } from 'firebase/auth'
+    import { getFirebase } from '~/lib/firebase'
+    const { auth } = getFirebase()
+    ;(async () => {
+      try { await signOut(auth) } catch {}
+      // Best-effort cookie clear at .oriz.in
+      document.cookie = 'oriz_auth=; Domain=.oriz.in; Path=/; Max-Age=0'
+      window.location.replace('/sign-in')
+    })()
+  </script>
+</BaseLayout>

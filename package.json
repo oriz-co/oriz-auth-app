@@ -1,0 +1,27 @@
+{
+  "name": "@oriz-co/oriz-auth-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Central sign-in surface for the oriz.in family — Astro 6 + Firebase Auth client SDK.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.34.3",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "deploy:pages": "wrangler pages deploy dist --project-name=oriz-auth-app --branch=main --commit-dirty=true",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "astro": "^6.4.7",
+    "firebase": "^11.0.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.102.0"
+  }
+}
