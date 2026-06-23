@@ -1,0 +1,234 @@
+---
+import DashboardLayout from '~/layouts/DashboardLayout.astro'
+---
+
+<DashboardLayout title="Security" section="security">
+	<h1>Security</h1>
+	<p class="lede">Linked sign-in methods, password, and active sessions.</p>
+
+	<section class="card">
+		<h2>Linked sign-in methods</h2>
+		<p class="muted">
+			Sign in faster by linking multiple providers. You'll always be able to sign in with
+			any of them.
+		</p>
+		<ul class="providers" id="providers"></ul>
+	</section>
+
+	<section class="card">
+		<h2>Password</h2>
+		<form id="pw-form" novalidate>
+			<div class="field">
+				<label for="current-password">Current password</label>
+				<input id="current-password" type="password" autocomplete="current-password" />
+			</div>
+			<div class="field">
+				<label for="new-password">New password</label>
+				<input
+					id="new-password"
+					type="password"
+					autocomplete="new-password"
+					minlength="8"
+				/>
+				<p class="hint">At least 8 characters.</p>
+			</div>
+			<button class="btn" type="submit">Change password</button>
+			<span class="status" id="pw-status" aria-live="polite"></span>
+		</form>
+	</section>
+
+	<section class="card">
+		<h2>Active sessions</h2>
+		<p class="muted">Current device + a button to sign out everywhere.</p>
+		<div class="session">
+			<div>
+				<strong id="ua-info">This device</strong>
+				<div class="hint" id="ua-detail"></div>
+			</div>
+			<button class="btn ghost" id="signout-all">Sign out everywhere</button>
+		</div>
+	</section>
+
+	<section class="card">
+		<h2>Two-factor authentication</h2>
+		<p class="muted">Coming soon — TOTP via authenticator app.</p>
+	</section>
+
+	<style>
+		h1 {
+			font-family: var(--serif);
+			font-size: clamp(1.5rem, 4vw, 2rem);
+			margin: 0 0 8px;
+		}
+		.lede {
+			color: var(--muted);
+			margin: 0 0 28px;
+		}
+		.card {
+			background: var(--card, #fff);
+			border: 1px solid var(--rule, #e6dfd2);
+			border-radius: 12px;
+			padding: 20px;
+			margin-bottom: 16px;
+		}
+		.card h2 {
+			margin: 0 0 8px;
+			font-family: var(--serif);
+			font-size: 1.1rem;
+		}
+		.muted {
+			color: var(--muted);
+			font-size: 0.88rem;
+			margin: 0 0 14px;
+		}
+		.providers {
+			list-style: none;
+			padding: 0;
+			margin: 0;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		}
+		.providers li {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 10px 14px;
+			background: var(--code-bg, #f5f1e8);
+			border-radius: 8px;
+			font-size: 0.92rem;
+		}
+		.providers .linked {
+			color: var(--accent);
+			font-weight: 500;
+			font-size: 0.82rem;
+		}
+		.field {
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+			margin-bottom: 14px;
+		}
+		.field label {
+			font-size: 0.85rem;
+			font-weight: 500;
+			color: var(--muted);
+		}
+		.field input {
+			padding: 9px 12px;
+			border: 1px solid var(--rule);
+			border-radius: 8px;
+			font-size: 0.95rem;
+			background: var(--card);
+		}
+		.hint {
+			font-size: 0.78rem;
+			color: var(--muted);
+			margin: 2px 0 0;
+		}
+		.btn {
+			padding: 9px 18px;
+			background: var(--accent);
+			color: #faf6ef;
+			border: 0;
+			border-radius: 8px;
+			font-weight: 500;
+			cursor: pointer;
+		}
+		.btn.ghost {
+			background: transparent;
+			color: var(--accent);
+			border: 1px solid var(--accent);
+		}
+		.btn:hover {
+			opacity: 0.9;
+		}
+		.status {
+			font-size: 0.85rem;
+			color: var(--muted);
+			margin-left: 10px;
+		}
+		.session {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 12px;
+			flex-wrap: wrap;
+		}
+	</style>
+
+	<script>
+		import { getFirebase } from '~/lib/firebase'
+		import {
+			onAuthStateChanged,
+			updatePassword,
+			EmailAuthProvider,
+			reauthenticateWithCredential,
+			signOut,
+		} from 'firebase/auth'
+
+		const { auth } = getFirebase()
+
+		const PROVIDERS = [
+			{ id: 'google.com', label: 'Google' },
+			{ id: 'github.com', label: 'GitHub' },
+			{ id: 'password', label: 'Email + password' },
+			{ id: 'phone', label: 'Phone OTP' },
+		]
+
+		onAuthStateChanged(auth, (user) => {
+			if (!user) return
+			const list = document.getElementById('providers') as HTMLUListElement
+			list.innerHTML = ''
+			const linked = new Set(user.providerData.map((p) => p.providerId))
+			for (const prov of PROVIDERS) {
+				const li = document.createElement('li')
+				const isLinked = linked.has(prov.id)
+				li.innerHTML = `
+					<span>${prov.label}</span>
+					${
+						isLinked
+							? '<span class="linked">✓ linked</span>'
+							: '<button class="link-prov" data-prov="' +
+								prov.id +
+								'">Link →</button>'
+					}
+				`
+				list.appendChild(li)
+			}
+			document.getElementById('ua-detail')!.textContent =
+				`${navigator.userAgent.split(') ')[0].split('(').pop() || 'browser'}, signed in`
+		})
+
+		document.getElementById('pw-form')?.addEventListener('submit', async (e) => {
+			e.preventDefault()
+			const user = auth.currentUser
+			if (!user || !user.email) return
+			const status = document.getElementById('pw-status') as HTMLElement
+			const cur = (document.getElementById('current-password') as HTMLInputElement).value
+			const nw = (document.getElementById('new-password') as HTMLInputElement).value
+			if (!cur || nw.length < 8) {
+				status.textContent = 'Need current password + new password (8+ chars).'
+				return
+			}
+			try {
+				const cred = EmailAuthProvider.credential(user.email, cur)
+				await reauthenticateWithCredential(user, cred)
+				await updatePassword(user, nw)
+				status.textContent = 'Password changed ✓'
+				;(e.target as HTMLFormElement).reset()
+			} catch (err) {
+				const e = err as { message?: string }
+				status.textContent = `Error: ${e.message ?? 'failed'}`
+			}
+		})
+
+		document.getElementById('signout-all')?.addEventListener('click', async () => {
+			if (!confirm('Sign out everywhere? You will need to sign in again on all devices.'))
+				return
+			await signOut(auth)
+			document.cookie = 'oriz_auth=; Domain=.oriz.in; Path=/; Max-Age=0'
+			window.location.replace('/sign-in/')
+		})
+	</script>
+</DashboardLayout>

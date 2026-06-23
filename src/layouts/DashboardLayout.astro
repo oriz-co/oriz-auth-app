@@ -1,0 +1,205 @@
+---
+/**
+ * DashboardLayout — wraps every /dashboard/** route.
+ *
+ * - Auth guard: redirects to /sign-in?return=<current> if no user.
+ * - Sidebar nav (desktop) / top bar (mobile).
+ * - Lazy-loads Firebase + Firestore SDK only on dashboard routes.
+ */
+import BaseLayout from './BaseLayout.astro'
+
+interface Props {
+	title: string
+	section?: 'home' | 'personal-info' | 'security' | 'subscription' | 'data-privacy'
+}
+
+const { title, section = 'home' } = Astro.props
+---
+
+<BaseLayout title={`${title} · Account · oriz`}>
+	<div class="dash">
+		<aside class="dash-side" aria-label="Account sections">
+			<div class="dash-user" data-auth-signed-in>
+				<img class="dash-avatar" data-auth-avatar src="" alt="" />
+				<div class="dash-meta">
+					<div class="dash-name" data-auth-name>Loading…</div>
+					<div class="dash-email" data-auth-email></div>
+					<span class="dash-tier" data-auth-tier>Free</span>
+				</div>
+			</div>
+
+			<nav class="dash-nav" aria-label="Account navigation">
+				<a href="/dashboard/" class={section === 'home' ? 'is-current' : ''}>Overview</a>
+				<a
+					href="/dashboard/personal-info/"
+					class={section === 'personal-info' ? 'is-current' : ''}>Personal info</a
+				>
+				<a href="/dashboard/security/" class={section === 'security' ? 'is-current' : ''}>
+					Security
+				</a>
+				<a
+					href="/dashboard/subscription/"
+					class={section === 'subscription' ? 'is-current' : ''}>Subscription</a
+				>
+				<a
+					href="/dashboard/data-privacy/"
+					class={section === 'data-privacy' ? 'is-current' : ''}>Data & privacy</a
+				>
+				<a href="/sign-out/" class="dash-signout">Sign out</a>
+			</nav>
+		</aside>
+
+		<main class="dash-main">
+			<slot />
+		</main>
+	</div>
+
+	<style>
+		.dash {
+			display: grid;
+			grid-template-columns: 260px 1fr;
+			gap: 32px;
+			max-width: 1100px;
+			margin: 0 auto;
+			padding: 32px 24px 64px;
+		}
+		@media (max-width: 800px) {
+			.dash {
+				grid-template-columns: 1fr;
+				gap: 16px;
+				padding: 16px 16px 48px;
+			}
+		}
+		.dash-side {
+			position: sticky;
+			top: 24px;
+			height: fit-content;
+		}
+		.dash-user {
+			display: flex;
+			gap: 12px;
+			align-items: center;
+			padding: 16px;
+			background: var(--card, #fff);
+			border: 1px solid var(--rule, #e6dfd2);
+			border-radius: 12px;
+			margin-bottom: 16px;
+		}
+		.dash-avatar {
+			width: 48px;
+			height: 48px;
+			border-radius: 50%;
+			background: var(--accent-soft, #e7efe9);
+			object-fit: cover;
+			flex-shrink: 0;
+		}
+		.dash-meta {
+			min-width: 0;
+			flex: 1;
+		}
+		.dash-name {
+			font-weight: 600;
+			font-size: 0.95rem;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.dash-email {
+			font-size: 0.78rem;
+			color: var(--muted, #6b6b6b);
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.dash-tier {
+			display: inline-block;
+			margin-top: 6px;
+			padding: 2px 8px;
+			font-size: 0.7rem;
+			border-radius: 999px;
+			background: #eee;
+			color: #555;
+			font-weight: 500;
+		}
+		.dash-tier[data-tier='pro'] {
+			background: var(--accent-soft);
+			color: var(--accent);
+		}
+		.dash-tier[data-tier='max'] {
+			background: #fef3c7;
+			color: #92400e;
+		}
+		.dash-nav {
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+			padding: 8px;
+			background: var(--card, #fff);
+			border: 1px solid var(--rule, #e6dfd2);
+			border-radius: 12px;
+		}
+		.dash-nav a {
+			display: block;
+			padding: 10px 14px;
+			border-radius: 8px;
+			color: var(--ink);
+			text-decoration: none;
+			font-size: 0.92rem;
+			transition: background 0.15s;
+		}
+		.dash-nav a:hover {
+			background: var(--accent-soft, #e7efe9);
+		}
+		.dash-nav a.is-current {
+			background: var(--accent, #2f4f3a);
+			color: #faf6ef;
+		}
+		.dash-signout {
+			margin-top: 8px;
+			border-top: 1px solid var(--rule);
+			padding-top: 14px !important;
+			color: var(--muted, #6b6b6b) !important;
+		}
+		.dash-main {
+			min-width: 0;
+		}
+	</style>
+
+	<script>
+		import { getFirebase, signInUrl } from '~/lib/firebase'
+		import { onAuthStateChanged } from 'firebase/auth'
+
+		const { auth } = getFirebase()
+		onAuthStateChanged(auth, (user) => {
+			if (!user) {
+				// Bounce to sign-in with return URL
+				window.location.replace(
+					`/sign-in/?return=${encodeURIComponent(window.location.href)}`
+				)
+				return
+			}
+			// Populate sidebar
+			const avatar = document.querySelector('[data-auth-avatar]') as HTMLImageElement | null
+			const name = document.querySelector('[data-auth-name]')
+			const email = document.querySelector('[data-auth-email]')
+			if (avatar)
+				avatar.src =
+					user.photoURL ||
+					'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="%232f4f3a"/><text x="24" y="30" text-anchor="middle" fill="%23faf6ef" font-family="serif" font-size="20">' +
+					(user.displayName?.[0] || user.email?.[0] || '?').toUpperCase() +
+					'</text></svg>'
+			if (name) name.textContent = user.displayName || user.email || 'Signed in'
+			if (email) email.textContent = user.email || ''
+
+			// Tier from custom claim
+			user.getIdTokenResult().then((token) => {
+				const tier = (token.claims.tier as string) || 'free'
+				const badge = document.querySelector('[data-auth-tier]') as HTMLElement | null
+				if (badge) {
+					badge.textContent = tier.charAt(0).toUpperCase() + tier.slice(1)
+					badge.dataset.tier = tier
+				}
+			})
+		})
+	</script>
+</BaseLayout>

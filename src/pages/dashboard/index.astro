@@ -1,0 +1,91 @@
+---
+import DashboardLayout from '~/layouts/DashboardLayout.astro'
+---
+
+<DashboardLayout title="Overview" section="home">
+	<header class="hd">
+		<h1>Your oriz account</h1>
+		<p class="lede">
+			One sign-in works across every <code>*.oriz.in</code> app. Manage your profile,
+			security, subscription, and data here.
+		</p>
+	</header>
+
+	<div class="cards">
+		<a class="card" href="/dashboard/personal-info/">
+			<div class="card-icon" aria-hidden="true">👤</div>
+			<h3>Personal info</h3>
+			<p>Name, email, phone, photo. Visible to other oriz users only if you opt in.</p>
+		</a>
+		<a class="card" href="/dashboard/security/">
+			<div class="card-icon" aria-hidden="true">🔒</div>
+			<h3>Security</h3>
+			<p>
+				Linked sign-in methods, password, active sessions, two-factor (coming soon).
+			</p>
+		</a>
+		<a class="card" href="/dashboard/subscription/">
+			<div class="card-icon" aria-hidden="true">⭐</div>
+			<h3>Subscription</h3>
+			<p>Your plan, payment history, invoices, next charge date. Upgrade or cancel.</p>
+		</a>
+		<a class="card" href="/dashboard/data-privacy/">
+			<div class="card-icon" aria-hidden="true">🛡️</div>
+			<h3>Data & privacy</h3>
+			<p>Download all your data. Delete your account. Per-feature privacy controls.</p>
+		</a>
+	</div>
+
+	<style>
+		.hd {
+			margin-bottom: 32px;
+		}
+		.hd h1 {
+			font-family: var(--serif);
+			font-size: clamp(1.6rem, 4vw, 2.25rem);
+			margin: 0 0 8px;
+			font-weight: 600;
+		}
+		.hd .lede {
+			color: var(--muted, #6b6b6b);
+			max-width: 60ch;
+			line-height: 1.6;
+		}
+		.cards {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 16px;
+		}
+		.card {
+			display: block;
+			padding: 22px;
+			background: var(--card, #fff);
+			border: 1px solid var(--rule, #e6dfd2);
+			border-radius: 12px;
+			text-decoration: none;
+			color: var(--ink);
+			transition:
+				transform 0.15s,
+				border-color 0.15s;
+		}
+		.card:hover {
+			transform: translateY(-2px);
+			border-color: var(--accent, #2f4f3a);
+		}
+		.card-icon {
+			font-size: 1.8rem;
+			margin-bottom: 10px;
+		}
+		.card h3 {
+			font-family: var(--serif);
+			margin: 0 0 6px;
+			font-size: 1.05rem;
+		}
+		.card p {
+			margin: 0;
+			color: var(--muted);
+			font-size: 0.88rem;
+			line-height: 1.5;
+		}
+	</style>
+</DashboardLayout>

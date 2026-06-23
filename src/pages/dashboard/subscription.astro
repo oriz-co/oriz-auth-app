@@ -1,0 +1,292 @@
+---
+import DashboardLayout from '~/layouts/DashboardLayout.astro'
+---
+
+<DashboardLayout title="Subscription" section="subscription">
+	<h1>Subscription</h1>
+	<p class="lede">Your plan, payment history, and next charge. Manage everything below.</p>
+
+	<section class="card current" id="current-plan">
+		<div class="plan-head">
+			<h2 id="plan-name">Free</h2>
+			<span class="plan-tier" id="plan-tier" data-tier="free">FREE</span>
+		</div>
+		<p id="plan-meta" class="muted">Loading…</p>
+		<div class="cta-row">
+			<a class="btn" href="https://oriz.in/pricing?app=account&return=https://account.oriz.in/dashboard/subscription/">
+				Upgrade
+			</a>
+			<button class="btn ghost" id="cancel-btn" style="display:none">Cancel subscription</button>
+		</div>
+	</section>
+
+	<section class="card">
+		<h2>Payment history</h2>
+		<table class="payments">
+			<thead>
+				<tr>
+					<th>Date</th>
+					<th>Plan</th>
+					<th>Amount</th>
+					<th>Status</th>
+					<th></th>
+				</tr>
+			</thead>
+			<tbody id="payments-tbody">
+				<tr>
+					<td colspan="5" class="muted">No payments yet.</td>
+				</tr>
+			</tbody>
+		</table>
+	</section>
+
+	<section class="card">
+		<h2>Billing FAQ</h2>
+		<details>
+			<summary>What payment methods do you accept?</summary>
+			<p>Razorpay processes UPI, cards, netbanking, and wallets — Indian customers only at the moment. International support coming via Paddle.</p>
+		</details>
+		<details>
+			<summary>How do I cancel?</summary>
+			<p>Click <strong>Cancel subscription</strong> above. You'll keep Pro features until the end of the current billing period, then revert to Free.</p>
+		</details>
+		<details>
+			<summary>Do you offer refunds?</summary>
+			<p>See <a href="https://oriz.in/refunds">oriz.in/refunds</a> for the refund policy.</p>
+		</details>
+		<details>
+			<summary>Is GST included?</summary>
+			<p>Prices shown are inclusive of GST as required for digital services in India.</p>
+		</details>
+	</section>
+
+	<style>
+		h1 {
+			font-family: var(--serif);
+			font-size: clamp(1.5rem, 4vw, 2rem);
+			margin: 0 0 8px;
+		}
+		.lede {
+			color: var(--muted);
+			margin: 0 0 28px;
+		}
+		.card {
+			background: var(--card, #fff);
+			border: 1px solid var(--rule, #e6dfd2);
+			border-radius: 12px;
+			padding: 22px;
+			margin-bottom: 16px;
+		}
+		.card.current {
+			border-color: var(--accent, #2f4f3a);
+		}
+		.card h2 {
+			margin: 0 0 12px;
+			font-family: var(--serif);
+			font-size: 1.15rem;
+		}
+		.plan-head {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 12px;
+		}
+		.plan-head h2 {
+			margin: 0;
+			font-size: 1.5rem;
+		}
+		.plan-tier {
+			padding: 4px 12px;
+			border-radius: 999px;
+			font-size: 0.78rem;
+			font-weight: 600;
+			background: #eee;
+			color: #555;
+		}
+		.plan-tier[data-tier='pro'] {
+			background: var(--accent-soft);
+			color: var(--accent);
+		}
+		.plan-tier[data-tier='max'] {
+			background: #fef3c7;
+			color: #92400e;
+		}
+		.muted {
+			color: var(--muted);
+			font-size: 0.92rem;
+		}
+		.cta-row {
+			display: flex;
+			gap: 10px;
+			margin-top: 16px;
+			flex-wrap: wrap;
+		}
+		.btn {
+			padding: 9px 18px;
+			background: var(--accent);
+			color: #faf6ef;
+			border: 0;
+			border-radius: 8px;
+			font-weight: 500;
+			cursor: pointer;
+			text-decoration: none;
+			font-size: 0.92rem;
+		}
+		.btn.ghost {
+			background: transparent;
+			color: var(--accent);
+			border: 1px solid var(--accent);
+		}
+		.btn:hover {
+			opacity: 0.9;
+		}
+		.payments {
+			width: 100%;
+			border-collapse: collapse;
+			font-size: 0.9rem;
+		}
+		.payments th,
+		.payments td {
+			padding: 8px 12px;
+			text-align: left;
+			border-bottom: 1px solid var(--rule);
+		}
+		.payments th {
+			background: var(--code-bg);
+			font-weight: 500;
+			font-size: 0.82rem;
+			color: var(--muted);
+		}
+		details {
+			margin-bottom: 8px;
+		}
+		details summary {
+			cursor: pointer;
+			padding: 8px 0;
+			font-weight: 500;
+		}
+		details p {
+			margin: 4px 0 12px;
+			color: var(--muted);
+			font-size: 0.9rem;
+			line-height: 1.55;
+		}
+	</style>
+
+	<script>
+		import { getFirebase } from '~/lib/firebase'
+		import { onAuthStateChanged } from 'firebase/auth'
+
+		const { auth } = getFirebase()
+
+		const PROJECT = 'oriz-app'
+		const fbBase = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`
+
+		onAuthStateChanged(auth, async (user) => {
+			if (!user) return
+			const token = await user.getIdToken()
+			const planName = document.getElementById('plan-name')!
+			const planTier = document.getElementById('plan-tier')!
+			const planMeta = document.getElementById('plan-meta')!
+			const cancelBtn = document.getElementById('cancel-btn')! as HTMLButtonElement
+
+			try {
+				const r = await fetch(`${fbBase}/users/${user.uid}`, {
+					headers: { Authorization: `Bearer ${token}` },
+				})
+				if (r.ok) {
+					const doc = await r.json()
+					const tier = doc.fields?.tier?.stringValue || 'free'
+					const status = doc.fields?.subscription_status?.stringValue || 'none'
+					const period = doc.fields?.subscription_period?.stringValue
+					const nextCharge = doc.fields?.next_charge_at?.timestampValue
+
+					planName.textContent = tier === 'free' ? 'Free' : tier === 'pro' ? 'Pro' : 'Max'
+					planTier.textContent = tier.toUpperCase()
+					planTier.dataset.tier = tier
+
+					if (tier === 'free') {
+						planMeta.textContent =
+							'You are on the Free tier. Upgrade for unlimited usage, AI features, and audio/travel/habit modules.'
+					} else {
+						const next = nextCharge
+							? new Date(nextCharge).toLocaleDateString(undefined, {
+									year: 'numeric',
+									month: 'long',
+									day: 'numeric',
+								})
+							: 'soon'
+						planMeta.textContent = `Status: ${status} · Billing period: ${period || 'monthly'} · Next charge: ${next}`
+						cancelBtn.style.display = 'inline-block'
+					}
+				} else {
+					planMeta.textContent = 'You are on the Free tier.'
+				}
+			} catch {
+				planMeta.textContent = 'Could not load subscription. Refresh to retry.'
+			}
+
+			// Load payment history
+			try {
+				const r = await fetch(`${fbBase}/users/${user.uid}/payments?pageSize=20&orderBy=created_at%20desc`, {
+					headers: { Authorization: `Bearer ${token}` },
+				})
+				if (r.ok) {
+					const data = await r.json()
+					const docs = (data.documents || []) as Array<{ fields: Record<string, unknown> }>
+					if (docs.length) {
+						const tbody = document.getElementById('payments-tbody')!
+						tbody.innerHTML = ''
+						for (const d of docs) {
+							const f = d.fields as Record<string, { stringValue?: string; doubleValue?: number; integerValue?: string; timestampValue?: string }>
+							const tr = document.createElement('tr')
+							const date = f.created_at?.timestampValue
+								? new Date(f.created_at.timestampValue).toLocaleDateString()
+								: '—'
+							const plan = f.plan_name?.stringValue || '—'
+							const amt = f.amount?.doubleValue ?? Number(f.amount?.integerValue ?? 0)
+							const stat = f.status?.stringValue || '—'
+							const inv = f.invoice_url?.stringValue || ''
+							tr.innerHTML = `
+								<td>${date}</td>
+								<td>${plan}</td>
+								<td>₹${amt}</td>
+								<td>${stat}</td>
+								<td>${inv ? `<a href="${inv}">Invoice ↗</a>` : ''}
+							`
+							tbody.appendChild(tr)
+						}
+					}
+				}
+			} catch {
+				/* no payments collection yet */
+			}
+		})
+
+		document.getElementById('cancel-btn')?.addEventListener('click', async () => {
+			if (
+				!confirm(
+					'Cancel your subscription? You will keep Pro features until the end of the current billing period.'
+				)
+			)
+				return
+			const user = auth.currentUser
+			if (!user) return
+			const token = await user.getIdToken()
+			try {
+				const r = await fetch('/api/billing-cancel-subscription', {
+					method: 'POST',
+					headers: { Authorization: `Bearer ${token}` },
+				})
+				if (r.ok) {
+					alert('Subscription cancellation scheduled. You will receive a confirmation email.')
+					window.location.reload()
+				} else {
+					alert(`Error: ${await r.text()}`)
+				}
+			} catch (err) {
+				alert(`Error: ${(err as Error).message}`)
+			}
+		})
+	</script>
+</DashboardLayout>

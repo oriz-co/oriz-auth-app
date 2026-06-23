@@ -35,20 +35,26 @@ export function getFirebase(): { app: FirebaseApp; auth: Auth } {
 // Sync the Firebase auth state into a cookie at .oriz.in so every subdomain
 // can read it (chrome / SSR / CF Pages Functions). We write a JSON blob with
 // the subset of fields the @chirag127/astro-shell `auth-gate` helpers expect
-// (displayName / email / photoURL / uid / exp). Firebase SDK refreshes the
-// underlying ID token automatically; we re-sync on every onIdTokenChanged so
-// `exp` stays fresh and avatar updates propagate.
+// (displayName / email / photoURL / uid / exp / idToken). Firebase SDK
+// refreshes the underlying ID token automatically; we re-sync on every
+// onAuthStateChanged so `exp` stays fresh and avatar updates propagate.
+//
+// idToken is included so cross-domain consumers (e.g. oriz.in's CheckoutButton)
+// can call Pages Functions with `Authorization: Bearer <idToken>` without
+// initialising Firebase Auth on the host page.
 export function startCookieSync(): () => void {
   const { auth } = getFirebase()
   const unsub = onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       // Build the JSON payload @chirag127/astro-shell/auth-gate expects.
       // exp = unix seconds, ~1h matches Firebase ID-token TTL.
+      const idToken = await user.getIdToken().catch(() => undefined)
       const payload = {
         uid: user.uid,
         email: user.email ?? undefined,
         displayName: user.displayName ?? undefined,
         photoURL: user.photoURL ?? undefined,
+        idToken,
         exp: Math.floor(Date.now() / 1000) + 3600,
       }
       const value = encodeURIComponent(JSON.stringify(payload))

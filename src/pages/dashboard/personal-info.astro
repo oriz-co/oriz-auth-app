@@ -1,0 +1,234 @@
+---
+import DashboardLayout from '~/layouts/DashboardLayout.astro'
+---
+
+<DashboardLayout title="Personal info" section="personal-info">
+	<h1>Personal info</h1>
+	<p class="lede">Update your name, email, phone, and profile photo.</p>
+
+	<form class="form" id="pi-form" novalidate>
+		<div class="field">
+			<label for="displayName">Display name</label>
+			<input id="displayName" type="text" autocomplete="name" />
+		</div>
+
+		<div class="field">
+			<label for="email">Email</label>
+			<input id="email" type="email" autocomplete="email" disabled />
+			<p class="hint">
+				Primary email. To change, you'll receive a verification link at the new address.
+				<button type="button" class="link-btn" id="change-email">Change email…</button>
+			</p>
+		</div>
+
+		<div class="field">
+			<label for="phone">Phone</label>
+			<input id="phone" type="tel" autocomplete="tel" disabled />
+			<p class="hint">
+				Phone is linked via Phone OTP sign-in. Pro tier feature.
+			</p>
+		</div>
+
+		<div class="field">
+			<label for="photoURL">Photo URL</label>
+			<input id="photoURL" type="url" placeholder="https://..." />
+			<p class="hint">Or sign in with Google to pull your Google avatar automatically.</p>
+		</div>
+
+		<div class="field">
+			<label for="dob">Date of birth</label>
+			<input id="dob" type="date" />
+		</div>
+
+		<div class="field">
+			<label for="locale">Preferred language</label>
+			<select id="locale">
+				<option value="en">English</option>
+				<option value="hi">हिन्दी (Hindi)</option>
+				<option value="bn">বাংলা (Bengali)</option>
+				<option value="ta">தமிழ் (Tamil)</option>
+				<option value="te">తెలుగు (Telugu)</option>
+				<option value="mr">मराठी (Marathi)</option>
+			</select>
+		</div>
+
+		<div class="row">
+			<button class="btn" type="submit">Save changes</button>
+			<span class="status" id="pi-status" aria-live="polite"></span>
+		</div>
+	</form>
+
+	<style>
+		h1 {
+			font-family: var(--serif);
+			font-size: clamp(1.5rem, 4vw, 2rem);
+			margin: 0 0 8px;
+		}
+		.lede {
+			color: var(--muted);
+			margin: 0 0 28px;
+		}
+		.form {
+			display: flex;
+			flex-direction: column;
+			gap: 18px;
+			max-width: 540px;
+		}
+		.field {
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+		}
+		.field label {
+			font-size: 0.85rem;
+			font-weight: 500;
+			color: var(--muted);
+		}
+		.field input,
+		.field select {
+			padding: 9px 12px;
+			border: 1px solid var(--rule, #e6dfd2);
+			border-radius: 8px;
+			font-size: 0.95rem;
+			background: var(--card, #fff);
+			color: var(--ink);
+		}
+		.field input:focus,
+		.field select:focus {
+			outline: 2px solid var(--accent);
+			outline-offset: 1px;
+		}
+		.field input:disabled {
+			background: var(--code-bg, #f5f1e8);
+			color: var(--muted);
+		}
+		.hint {
+			font-size: 0.78rem;
+			color: var(--muted);
+			margin: 2px 0 0;
+		}
+		.link-btn {
+			background: none;
+			border: 0;
+			color: var(--accent);
+			cursor: pointer;
+			padding: 0;
+			text-decoration: underline;
+			font: inherit;
+		}
+		.row {
+			display: flex;
+			gap: 14px;
+			align-items: center;
+			margin-top: 8px;
+		}
+		.btn {
+			padding: 10px 18px;
+			background: var(--accent);
+			color: #faf6ef;
+			border: 0;
+			border-radius: 8px;
+			font-weight: 500;
+			cursor: pointer;
+		}
+		.btn:hover {
+			opacity: 0.9;
+		}
+		.status {
+			font-size: 0.85rem;
+			color: var(--muted);
+		}
+	</style>
+
+	<script>
+		import { getFirebase } from '~/lib/firebase'
+		import { onAuthStateChanged, updateProfile, verifyBeforeUpdateEmail } from 'firebase/auth'
+
+		const { auth } = getFirebase()
+		const form = document.getElementById('pi-form') as HTMLFormElement
+		const status = document.getElementById('pi-status') as HTMLElement
+		const displayName = document.getElementById('displayName') as HTMLInputElement
+		const email = document.getElementById('email') as HTMLInputElement
+		const phone = document.getElementById('phone') as HTMLInputElement
+		const photoURL = document.getElementById('photoURL') as HTMLInputElement
+		const dob = document.getElementById('dob') as HTMLInputElement
+		const locale = document.getElementById('locale') as HTMLSelectElement
+
+		onAuthStateChanged(auth, async (user) => {
+			if (!user) return
+			displayName.value = user.displayName || ''
+			email.value = user.email || ''
+			phone.value = user.phoneNumber || ''
+			photoURL.value = user.photoURL || ''
+
+			// Load DOB + locale from Firestore via REST
+			try {
+				const token = await user.getIdToken()
+				const r = await fetch(
+					`https://firestore.googleapis.com/v1/projects/oriz-app/databases/(default)/documents/users/${user.uid}`,
+					{ headers: { Authorization: `Bearer ${token}` } }
+				)
+				if (r.ok) {
+					const doc = await r.json()
+					if (doc.fields?.dob?.stringValue) dob.value = doc.fields.dob.stringValue
+					if (doc.fields?.locale?.stringValue) locale.value = doc.fields.locale.stringValue
+				}
+			} catch {
+				/* doc may not exist yet; ignore */
+			}
+		})
+
+		form.addEventListener('submit', async (e) => {
+			e.preventDefault()
+			const user = auth.currentUser
+			if (!user) return
+			status.textContent = 'Saving…'
+			try {
+				await updateProfile(user, {
+					displayName: displayName.value.trim() || null,
+					photoURL: photoURL.value.trim() || null,
+				})
+
+				// Save dob + locale to Firestore via REST PATCH (upsert)
+				const token = await user.getIdToken()
+				await fetch(
+					`https://firestore.googleapis.com/v1/projects/oriz-app/databases/(default)/documents/users/${user.uid}?updateMask.fieldPaths=dob&updateMask.fieldPaths=locale`,
+					{
+						method: 'PATCH',
+						headers: {
+							Authorization: `Bearer ${token}`,
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({
+							fields: {
+								dob: { stringValue: dob.value },
+								locale: { stringValue: locale.value },
+							},
+						}),
+					}
+				)
+				status.textContent = 'Saved ✓'
+				setTimeout(() => {
+					status.textContent = ''
+				}, 2000)
+			} catch (err) {
+				const e = err as { message?: string }
+				status.textContent = `Error: ${e.message ?? 'failed to save'}`
+			}
+		})
+
+		document.getElementById('change-email')?.addEventListener('click', async () => {
+			const user = auth.currentUser
+			if (!user) return
+			const newEmail = window.prompt('Enter your new email address:')
+			if (!newEmail) return
+			try {
+				await verifyBeforeUpdateEmail(user, newEmail)
+				status.textContent = `Verification email sent to ${newEmail}. Click the link to complete the change.`
+			} catch (err) {
+				const e = err as { message?: string }
+				status.textContent = `Error: ${e.message ?? 'failed'}`
+			}
+		})
+	</script>
+</DashboardLayout>

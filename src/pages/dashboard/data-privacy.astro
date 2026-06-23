@@ -1,0 +1,275 @@
+---
+import DashboardLayout from '~/layouts/DashboardLayout.astro'
+---
+
+<DashboardLayout title="Data & privacy" section="data-privacy">
+	<h1>Data & privacy</h1>
+	<p class="lede">
+		Download a complete copy of your data. Delete your account. Control what gets tracked.
+	</p>
+
+	<section class="card">
+		<h2>Privacy controls</h2>
+		<p class="muted">Each toggle controls one tracker family-wide.</p>
+		<div class="toggles" id="toggles">
+			<label class="toggle">
+				<input type="checkbox" data-pref="analytics" />
+				<span class="t-label">
+					<strong>Analytics</strong>
+					<span class="hint">CF Web Analytics + GA4 + Microsoft Clarity + PostHog</span>
+				</span>
+			</label>
+			<label class="toggle">
+				<input type="checkbox" data-pref="crash_reports" />
+				<span class="t-label">
+					<strong>Crash reports</strong>
+					<span class="hint">Sentry error tracking. Helps fix bugs.</span>
+				</span>
+			</label>
+			<label class="toggle">
+				<input type="checkbox" data-pref="marketing_emails" />
+				<span class="t-label">
+					<strong>Marketing emails</strong>
+					<span class="hint">Product updates, new features, occasional newsletters.</span>
+				</span>
+			</label>
+			<label class="toggle">
+				<input type="checkbox" data-pref="product_updates" />
+				<span class="t-label">
+					<strong>Product updates</strong>
+					<span class="hint">Subscription renewal, security alerts, account changes.</span>
+				</span>
+			</label>
+		</div>
+		<span class="status" id="prefs-status" aria-live="polite"></span>
+	</section>
+
+	<section class="card">
+		<h2>Download your data</h2>
+		<p class="muted">
+			A complete JSON archive of every Firestore document associated with your account —
+			journal entries, settings, habits, payment history. Email is sent when ready.
+		</p>
+		<button class="btn" id="export-btn">Request data export</button>
+		<span class="status" id="export-status" aria-live="polite"></span>
+	</section>
+
+	<section class="card danger">
+		<h2>Delete your account</h2>
+		<p class="muted">
+			This deletes your Firebase user, all Firestore documents under <code>users/&#123;uid&#125;/**</code>, and
+			your journal entries. The 5-host image pipeline does NOT actively delete blobs — they
+			age out via host quotas. <strong>This action cannot be undone.</strong>
+		</p>
+		<button class="btn danger-btn" id="delete-btn">Delete my account…</button>
+	</section>
+
+	<style>
+		h1 {
+			font-family: var(--serif);
+			font-size: clamp(1.5rem, 4vw, 2rem);
+			margin: 0 0 8px;
+		}
+		.lede {
+			color: var(--muted);
+			margin: 0 0 28px;
+		}
+		.card {
+			background: var(--card, #fff);
+			border: 1px solid var(--rule, #e6dfd2);
+			border-radius: 12px;
+			padding: 22px;
+			margin-bottom: 16px;
+		}
+		.card.danger {
+			border-color: #dc2626;
+		}
+		.card h2 {
+			margin: 0 0 8px;
+			font-family: var(--serif);
+			font-size: 1.1rem;
+		}
+		.muted {
+			color: var(--muted);
+			font-size: 0.9rem;
+			line-height: 1.6;
+		}
+		.toggles {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+			margin-top: 16px;
+		}
+		.toggle {
+			display: flex;
+			gap: 14px;
+			align-items: flex-start;
+			cursor: pointer;
+			padding: 10px;
+			border-radius: 8px;
+			transition: background 0.15s;
+		}
+		.toggle:hover {
+			background: var(--code-bg, #f5f1e8);
+		}
+		.toggle input {
+			margin: 2px 0 0;
+			width: 18px;
+			height: 18px;
+			accent-color: var(--accent);
+		}
+		.t-label {
+			display: flex;
+			flex-direction: column;
+			gap: 2px;
+		}
+		.hint {
+			color: var(--muted);
+			font-size: 0.82rem;
+		}
+		.btn {
+			padding: 9px 18px;
+			background: var(--accent);
+			color: #faf6ef;
+			border: 0;
+			border-radius: 8px;
+			font-weight: 500;
+			cursor: pointer;
+		}
+		.btn.danger-btn {
+			background: #dc2626;
+		}
+		.btn:hover {
+			opacity: 0.9;
+		}
+		.status {
+			font-size: 0.85rem;
+			color: var(--muted);
+			margin-left: 10px;
+		}
+	</style>
+
+	<script>
+		import { getFirebase } from '~/lib/firebase'
+		import { onAuthStateChanged, signOut } from 'firebase/auth'
+
+		const { auth } = getFirebase()
+		const PROJECT = 'oriz-app'
+		const fbBase = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`
+
+		// Load + persist privacy prefs
+		onAuthStateChanged(auth, async (user) => {
+			if (!user) return
+			const token = await user.getIdToken()
+			try {
+				const r = await fetch(`${fbBase}/users/${user.uid}`, {
+					headers: { Authorization: `Bearer ${token}` },
+				})
+				if (r.ok) {
+					const doc = await r.json()
+					const prefs = doc.fields?.privacy_prefs?.mapValue?.fields ?? {}
+					document.querySelectorAll<HTMLInputElement>('[data-pref]').forEach((el) => {
+						const k = el.dataset.pref!
+						el.checked = prefs[k]?.booleanValue ?? true // default on
+					})
+				} else {
+					document.querySelectorAll<HTMLInputElement>('[data-pref]').forEach((el) => {
+						el.checked = true
+					})
+				}
+			} catch {
+				document.querySelectorAll<HTMLInputElement>('[data-pref]').forEach((el) => {
+					el.checked = true
+				})
+			}
+		})
+
+		document.querySelectorAll<HTMLInputElement>('[data-pref]').forEach((el) => {
+			el.addEventListener('change', async () => {
+				const user = auth.currentUser
+				if (!user) return
+				const status = document.getElementById('prefs-status')!
+				status.textContent = 'Saving…'
+				const token = await user.getIdToken()
+				const fields: Record<string, { booleanValue: boolean }> = {}
+				document.querySelectorAll<HTMLInputElement>('[data-pref]').forEach((e) => {
+					fields[e.dataset.pref!] = { booleanValue: e.checked }
+				})
+				try {
+					await fetch(
+						`${fbBase}/users/${user.uid}?updateMask.fieldPaths=privacy_prefs`,
+						{
+							method: 'PATCH',
+							headers: {
+								Authorization: `Bearer ${token}`,
+								'Content-Type': 'application/json',
+							},
+							body: JSON.stringify({
+								fields: {
+									privacy_prefs: { mapValue: { fields } },
+								},
+							}),
+						}
+					)
+					status.textContent = 'Saved ✓'
+					setTimeout(() => {
+						status.textContent = ''
+					}, 1500)
+				} catch {
+					status.textContent = 'Save failed'
+				}
+			})
+		})
+
+		document.getElementById('export-btn')?.addEventListener('click', async () => {
+			const user = auth.currentUser
+			if (!user) return
+			const status = document.getElementById('export-status')!
+			status.textContent = 'Requesting…'
+			const token = await user.getIdToken()
+			try {
+				const r = await fetch('/api/data-export', {
+					method: 'POST',
+					headers: { Authorization: `Bearer ${token}` },
+				})
+				if (r.ok) {
+					status.textContent =
+						'Export queued. You will receive a download link by email within a few minutes.'
+				} else {
+					status.textContent = `Error: ${await r.text()}`
+				}
+			} catch (err) {
+				status.textContent = `Error: ${(err as Error).message}`
+			}
+		})
+
+		document.getElementById('delete-btn')?.addEventListener('click', async () => {
+			const user = auth.currentUser
+			if (!user) return
+			const confirm1 = window.prompt(
+				'This permanently deletes your oriz account and all data. Type DELETE to confirm:'
+			)
+			if (confirm1 !== 'DELETE') return
+			const token = await user.getIdToken()
+			try {
+				const r = await fetch('/api/account-delete', {
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${token}`,
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({ confirm: 'DELETE' }),
+				})
+				if (r.ok) {
+					await signOut(auth)
+					document.cookie = 'oriz_auth=; Domain=.oriz.in; Path=/; Max-Age=0'
+					window.location.replace('https://oriz.in/?account_deleted=1')
+				} else {
+					alert(`Error: ${await r.text()}`)
+				}
+			} catch (err) {
+				alert(`Error: ${(err as Error).message}`)
+			}
+		})
+	</script>
+</DashboardLayout>
