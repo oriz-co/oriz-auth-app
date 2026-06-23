@@ -18,23 +18,28 @@ import Brand from '~/components/Brand.astro'
         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2.03c-3.2.7-3.87-1.36-3.87-1.36-.52-1.32-1.28-1.67-1.28-1.67-1.04-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.97.1-.74.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.04 0 0 .97-.31 3.19 1.18a11 11 0 0 1 5.81 0c2.21-1.49 3.18-1.18 3.18-1.18.63 1.58.23 2.75.11 3.04.74.81 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.13v3.16c0 .31.21.67.8.56C20.21 21.38 23.5 17.08 23.5 12 23.5 5.65 18.35.5 12 .5z"/></svg>
         <span class="label">Continue with GitHub</span>
       </button>
-
-      <button class="btn" data-provider="microsoft" type="button">
-        <svg class="icon" viewBox="0 0 23 23" aria-hidden="true"><path fill="#f25022" d="M0 0h11v11H0z"/><path fill="#7fba00" d="M12 0h11v11H12z"/><path fill="#00a4ef" d="M0 12h11v11H0z"/><path fill="#ffb900" d="M12 12h11v11H12z"/></svg>
-        <span class="label">Continue with Microsoft</span>
-      </button>
     </div>
 
-    <div class="divider">or</div>
+    <div class="divider" style="margin-top:1rem">or use email</div>
 
     <form id="email-form" class="stack" novalidate>
       <div class="field">
         <label for="email">Email</label>
-        <input id="email" type="email" autocomplete="email" required placeholder="you@oriz.in" />
+        <input id="email" type="email" autocomplete="email" required placeholder="you@example.com" />
       </div>
-      <button class="btn btn-primary" type="submit" data-action="email-link">
-        <span class="label">Send sign-in link</span>
-      </button>
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required minlength="8" placeholder="At least 8 characters" />
+      </div>
+      <div class="row" style="display:flex;gap:.5rem">
+        <button class="btn" type="submit" data-action="signin">
+          <span class="label">Sign in</span>
+        </button>
+        <button class="btn btn-secondary" type="button" data-action="signup">
+          <span class="label">Create account</span>
+        </button>
+      </div>
+      <p class="tiny"><a href="/forgot-password">Forgot password?</a></p>
     </form>
 
     <div class="more">
@@ -66,9 +71,9 @@ import Brand from '~/components/Brand.astro'
     import {
       GoogleAuthProvider,
       GithubAuthProvider,
-      OAuthProvider,
       signInWithPopup,
-      sendSignInLinkToEmail,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
       RecaptchaVerifier,
       signInWithPhoneNumber,
       type ConfirmationResult,
@@ -95,17 +100,15 @@ import Brand from '~/components/Brand.astro'
       if (user) window.location.replace(safeReturnURL(ret))
     })
 
-    // OAuth popup flow
-    async function oauth(name: 'google' | 'github' | 'microsoft') {
+    // OAuth popup flow — Google + GitHub only
+    async function oauth(name: 'google' | 'github') {
       clear()
       try {
         let provider
         if (name === 'google') provider = new GoogleAuthProvider()
-        else if (name === 'github') {
+        else {
           provider = new GithubAuthProvider()
           provider.addScope('read:user')
-        } else {
-          provider = new OAuthProvider('microsoft.com')
         }
         await signInWithPopup(auth, provider)
         // onAuthStateChanged will redirect
@@ -118,34 +121,55 @@ import Brand from '~/components/Brand.astro'
 
     document.querySelectorAll<HTMLButtonElement>('[data-provider]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const name = btn.dataset.provider as 'google' | 'github' | 'microsoft'
+        const name = btn.dataset.provider as 'google' | 'github'
         oauth(name)
       })
     })
 
-    // Email magic link
+    // Email + Password (traditional)
     const emailForm = document.getElementById('email-form') as HTMLFormElement
+    const emailInput = () => (document.getElementById('email') as HTMLInputElement).value.trim()
+    const passwordInput = () => (document.getElementById('password') as HTMLInputElement).value
+
     emailForm.addEventListener('submit', async (e) => {
       e.preventDefault()
       clear()
-      const email = (document.getElementById('email') as HTMLInputElement).value.trim()
-      if (!email) return show('Enter your email.', 'error')
-      const url = new URL('/finish-sign-in', window.location.origin)
-      url.searchParams.set('return', ret)
+      const email = emailInput()
+      const password = passwordInput()
+      if (!email || !password) return show('Email + password required.', 'error')
       try {
-        await sendSignInLinkToEmail(auth, email, {
-          url: url.toString(),
-          handleCodeInApp: true,
-        })
-        window.localStorage.setItem('oriz_email_for_sign_in', email)
-        show(`We sent a sign-in link to ${email}. Open it on this device.`, 'success')
+        await signInWithEmailAndPassword(auth, email, password)
       } catch (err) {
-        const e = err as { message?: string }
-        show(e.message ?? 'Could not send sign-in link.', 'error')
+        const e = err as { code?: string; message?: string }
+        if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+          show('No account with that email — click "Create account" to sign up.', 'error')
+        } else if (e.code === 'auth/wrong-password') {
+          show('Wrong password.', 'error')
+        } else {
+          show(e.message ?? 'Sign-in failed.', 'error')
+        }
       }
     })
 
-    // Tier-gated "more options" reveal
+    document.querySelector('[data-action="signup"]')?.addEventListener('click', async () => {
+      clear()
+      const email = emailInput()
+      const password = passwordInput()
+      if (!email || !password) return show('Email + password required to create account.', 'error')
+      if (password.length < 8) return show('Password must be 8+ characters.', 'error')
+      try {
+        await createUserWithEmailAndPassword(auth, email, password)
+      } catch (err) {
+        const e = err as { code?: string; message?: string }
+        if (e.code === 'auth/email-already-in-use') {
+          show('Account exists — try signing in instead.', 'error')
+        } else {
+          show(e.message ?? 'Could not create account.', 'error')
+        }
+      }
+    })
+
+    // Tier-gated "more options" reveal (Phone OTP)
     const moreBtn = document.getElementById('more-btn') as HTMLButtonElement
     const gated = document.getElementById('gated') as HTMLDivElement
     const reveal = () => { gated.dataset.open = 'true'; moreBtn.style.display = 'none' }

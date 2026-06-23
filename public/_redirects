@@ -1,0 +1,2 @@
+# Force canonical account.oriz.in
+https://auth.oriz.in/*  https://account.oriz.in/:splat  301
