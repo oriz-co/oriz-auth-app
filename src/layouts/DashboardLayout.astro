@@ -166,8 +166,13 @@ const { title, section = 'home' } = Astro.props
 	</style>
 
 	<script>
-		import { getFirebase, signInUrl } from '~/lib/firebase'
+		import { getFirebase, signInUrl, startCookieSync } from '~/lib/firebase'
 		import { onAuthStateChanged } from 'firebase/auth'
+
+		// Auth bug fix 2026-06-24: dashboard pages weren't keeping the
+		// `oriz_auth` cookie fresh, so it expired ~1h after sign-in even while
+		// the user was actively in the dashboard. Wire sync here too.
+		startCookieSync()
 
 		const { auth } = getFirebase()
 		onAuthStateChanged(auth, (user) => {

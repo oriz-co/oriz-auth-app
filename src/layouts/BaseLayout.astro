@@ -17,7 +17,7 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={`https://auth.oriz.in${Astro.url.pathname}`} />
+    <link rel="canonical" href={`https://account.oriz.in${Astro.url.pathname}`} />
     <meta name="theme-color" content="#2f4f3a" />
     <meta name="referrer" content="no-referrer" />
     <meta name="robots" content="noindex, nofollow" />
@@ -38,5 +38,18 @@ const {
         <div class="tiny" style="margin-top:0.4rem;">© oriz · central auth surface</div>
       </footer>
     </div>
+
+    <!--
+      Auth bug fix 2026-06-24: cookie sync was only firing on /sign-in,
+      /account, /verify-email — meaning every other account.oriz.in page
+      (dashboard/*, admin/*) never refreshed the `oriz_auth` cookie. After
+      ~1 h the cookie expired and every other *.oriz.in app saw the user
+      as signed-out. Wiring sync into BaseLayout means EVERY page on the
+      auth surface keeps the cookie alive while the user is browsing it.
+    -->
+    <script>
+      import { startCookieSync } from '~/lib/firebase'
+      startCookieSync()
+    </script>
   </body>
 </html>
